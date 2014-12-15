@@ -1,0 +1,100 @@
+---
+title: "Practical Machine Learning Project"
+author: "Shengbing Huang"
+date: "Wednesday, December 10, 2014"
+output: html_document
+---
+
+**Download training data and test data**
+
+```{r, eval=FALSE}
+setwd("C:/Users/Shengbing/Documents/R/practical_machine_learning/project/")
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "training", method='auto')
+download.file(url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "testing", method="auto")
+
+```
+**Read files:**
+
+
+```{r}
+training<-read.csv('training')
+testing<-read.csv('testing')
+```
+**Cleaning data**
+```{r}
+#find columns with missing values in testing
+missing.testing<-apply(testing, 2, function(x) any(is.na(x)))
+
+#find columns with missing values in training
+missing.training<-apply(training, 2, function(x) any(is.na(x)))
+
+# test whether all features of testing with intact (without missing) values are in feature of #trainig with intact values
+names(testing)[!missing.testing] %in% names(training)[!missing.training]
+cat('Except the response, the total variable number to be used is: ')
+sum(names(testing)[!missing.testing] %in% names(training)[!missing.training])
+
+#subsetting the training and testing data
+training<-training[, !missing.training]
+testing<-testing[, !missing.testing]
+
+#remove the variables of trainig that are not in testing
+index.exist<-names(training) %in% names(testing)
+training<-data.frame(training[, index.exist], classe=training$classe)
+
+#remove the variable x as it is just the observation index
+training<-training[, -1]
+testing<-testing[, -1]
+```
+
+
+**train the data and do prediction**
+```{r}
+library(caret)
+library(randomForest)
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10)
+                            
+set.seed(2)
+subset2<-sample(dim(training)[1], 2500)
+set.seed(3)
+rfFit2<-train(classe ~ ., data = training, subset=subset2,
+                 method = "rf",
+                 trControl = fitControl,
+              ntree = 100, verbose = T)
+
+set.seed(4)
+subset3<-sample(dim(training)[1], 2500)
+set.seed(5)
+rfFit3<-train(classe ~ ., data = training, subset=subset3,
+                 method = "rf",
+                 trControl = fitControl,
+              ntree = 100, verbose = T)
+```
+
+**predict testing data**
+```{r}
+predict(rfFit2, testing)
+cat('predict one more using a  second model derived from different bootstrap of training data')
+predict(rfFit3, testing)
+```
+
+**Estimate the error**
+```{r}
+rfFit2$finalModel
+confusionMatrix(rfFit2)
+```
+
+**Submit the assignment**
+```{r, eval=F}
+answers=as.character(predict(rfFit2, testing))
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(answers)
+```
